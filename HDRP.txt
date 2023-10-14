@@ -1,0 +1,139 @@
+1、 Introduce to HDRP:
+	Abstract:
+	offline-rendering and real-time
+		pro-Builder/proGrid/proBrush
+		Timeline/Cinemachine/HD Post processing effect
+		ShaderGraph / VisualEffectGraph/ UnityRecorder/HDRP for materials
+	DCC for preparing models
+		unit unity
+		triangles for required places
+		UV making
+		FBX/USD/Alembic format
+		Unity Reflect inport AutoDesk Revit
+	Setting for HDRP
+	
+2、 Sample_scene for Volume
+	Volume Struct
+	Add post-processing 
+	Lighting/Lighting Probe / Reflection probe
+	bake lighting map
+	
+3、 HDRP profile & Volume structure desc
+	HDRP Asset Rendering Setting:
+		Frame Setting (Project settings -> HDRP Default Settings -> Frame Settings -> Default Frame Settings For)
+			Camera / Baked Or Custom Reflection / RealTime Reflection
+			Volume Structure: attach to related cameara settings(***)
+		HDRP functions:
+			Rendering:
+				Color Buffer Format / Lit Shader Mode(Forward,Deferred,Both) / 
+				Motion Vectors(TAA need) / RuntimeDebug Display()/
+				Dithering Cross-fade(LOD smoothing transfer)/Terrain Hole(display)/Transparent Backface/
+				Transparent Depth Prepass/ Transparent Depth Postpass(透明深度后处理)/
+				Custom Pass(user-defined pass)/RealTime Raytracing / LOD bias/ maximum LOD level/Decals/
+				Dynamic Resolution / Low res Transparency/ 
+			Lighting:
+				Scrreen Space Ambient Occlusion/Volumetrics/Light Layers/Cookies/Cookies/Reflections/
+				Sky/Lighting Override Mask/Shadows[Directional Light Shadows、Punctual Light Shadows、Area Light Shadows]/
+				Lights
+			Lighting Quality Settings
+				Screen Space Ambient Occlusion/Contact Shadows/Screen Space Reflection
+			Material:
+				Available Material Quality Levels/Default Material Quality Level/Distortion[for material]/SubSurface Scattering/
+				Fabric BSDF Convolution/ Diffusion Profile List / 
+			Post-Processing
+				Grading LUT Size & Grading LUT format / Buffer Format
+			Post-processing Quality Settings
+				DoF/Motion Blur / Bloom / Chromatic/Aberration/Bloom/XR Setting[PC DX11 / PS4 PlayStation VR,Open VR*]
+		Deffrent platform <--> Diffrent profile setting
+	Volume Structure Detail
+		Scene Setting / Contact Shadow,Micro Shadow / fog,Reflection & refraction/post-processing / Ray-tracing
+		Volume: Global/Local
+			Exposure[Fixed,Automatic,Curve Mapping,use Physical Camera]::wikipedia -- Exposure_value / 
+			Visual Environment[sky:: Static/Dynamic],HDRI Sky[HDRI Sky] & Exposure
+			HDRI Sky:: Rotation/Update mode/exposure       ::::: Metering Mode/Luminance Source/Compensation/Limit Min[Max]、Adaptation
+			Fog: 
+				Density Volume: Single Scattering Albedo, Fog Distance,Size,
+			Lighting:
+				Ambient Occlusion; Indirect Lighting Controller; Screen Space Reflection; Screen Space Refraction;
+			Material: HDRP中，Diffusion profile 保存3S的配置信息；全局添加，可以减少性能的消耗
+			Shadowing
+			Sky: HDRI Sky,Gradient Sky, Physically Based Sky:
+				Earth Preset / Planet Center Position/ Ground Color Texture/ Ground Tint/Ground Tint/Ground Emission Texture/ Ground Emission Multiplier
+			Post-processing
+			Ray Tracing
+			Local Volume(本地 Volume) : Global Volume
+
+4、 HDRP光照系统详解
+	
+5、 LightingMapping（光照烘焙）详解
+	UV Inspector
+		1、渐进式光照贴图烘焙对场景中模型的需求
+			1、模型上不能有重叠UV
+			2、UV上有足够的间距以避免“渗色”现象的发生；
+			3、 因为使用光照贴图只能烘焙静态物体
+			对硬件的需求：
+				1、 需要一块支持openCL 1.2的显卡
+				2、 至少2GB的显存
+				3、 CPU支持SSE4.1的指令
+			支持的渲染渲染管线： Build-in Render Pipeline // URP // HDRP
+		2、渐进式光照贴图烘焙出来的是 Lightmaps,lightprobes,Reflection Probes
+		3、Baked Indirect mode / ShadowMask Mode 、 Subtractive模式
+		4、烘焙参数：采样设置{Bounces[一般2次即可]}，降噪设置相关[自动，高级]，光照贴图分辨率[Resolution,padding,Size]，Compress lightmaps，Ambient Occlusion[MAx distance
+		,光贡献{间接光、直接光}，方向模式{Directional,non-Directional}]，Indirect Intensity & Albedo Boost, LightMap Parameters;
+		5、解决光照贴图接缝问题: mesh Renderer 组件汇总的Stitch Seams选项
+		6、 如何整体地查看光照贴图的不同组成部分：UV charts
+
+5、 HDRP材质详解：当前不支持散焦效果
+		使用Lit着色器制作典型材质
+			Normal Map Space选择Object Space节省性能，用于静态对象
+			Displacement mode： 置换模式 和 Height Map高度图: 为泥土部分网格增加细节表现
+			Specular Color： 高光颜色【Energy Conserving Specular Color: 高光太强烈时，降低材质的漫反射色】
+			Mask Map： 不同通道代表不同的参数遮罩
+			SurfaceType[transparent]: 
+				rendering pass:: Before Refraction,Default,Low Resolution; 
+				Blending Mode[Alpha,Additive,Premultiply]
+				Preserve Specular lighting
+				Receive Fog,Back Then Front Rendering,Transparent Depth Prepass,Transparent Depth PostPass, Transparent Writes Motion Vectors,Depth Write,Depth Test,
+					Cull Mode, Reseive Decals, Mask Map;
+			（带折射，颜色）玻璃材质：
+				Double-sided,back then front rendering,Depth Write,Transparent Depth Prepass,Transparent Depth Postpass;
+				折射模型
+					None,Box,Sphere,Thin,
+				Index of Refraction
+				Thickness：控制厚度
+			正确渲染玻璃瓶：
+				折射率、物体厚度、透射颜色、透射吸收距离
+			半透明材质和SSS
+				一个HDRP最多关联15个漫反射配置文件
+				Opaque & 3S [SurfaceType] // Subsurface Mask [次表面遮罩] // Subsurface Mask Map [次表面遮罩纹理] 
+				// Thickness [厚度]  // Diffusion Profile [漫反射配置文件]{散射距离、最大半径、折射率、世界单位大小、SSS-only[Texturing Mode]、Transmission only{透射模式，透射着色，Min-Max}}
+			自发光材质：
+			贴花使用方法：1、 Decal projector； 2、 HDRP的标准Decal着色器；
+			渲染器和材质优先级：
+			使用HDRP自带的示例材质库：：金属箔材质[Metal Foil]、肥皂泡材质[Transparent{透明}，Iridescence{彩虹色}]、Alpha CLipping[透明度裁剪]
+
+6、 Post Processing后处理详情
+		1、 后处理效果应用顺序及效果组合
+				Tonemapping（色调映射）、WhiteBalance、Bloom[Quality{泛光效果}]、Film Grain、DoF、Panini Projection[对画面进行变形操作(中间凸起)]、
+				Lens Distortion、Motion Blur、Chromatic Aberration、Vignette[画面周围变暗或者减少饱和度]、Lift-Gamma和Gain、Channel Mixer(通道混合)、
+				Color Curve（颜色曲线）、Color Adjustment（颜色调整）、Split Toning(分离调色)、Shadow-ModTones-Highlights
+		2、 HDRP Debug窗口
+			Debug窗口：
+				PC: Ctrl + 回退键
+				VR手柄可以打开Debug窗口
+				
+7、 HDRP在VR中的应用
+		HDRP VR,XR plug-in Management,
+	
+8、 HDRP Custom Pass应用
+		Custom-Pass.html
+		
+9、 HDRP 实时光线追踪项目
+		运行光锥所需软硬件
+		
+				
+				
+				
+				
+			
+				
