@@ -1,0 +1,11 @@
+3D Object struction
+
+1、 Im4D: High-Fidelity and Real-Time Novel View Synthesis for Dynamic Scenes
+	3D去噪，边缘问题清晰化
+
+2、 Interactive Hair Simulation on GPU using ADMM
+	毛发模拟系统
+
+3、 DreamFace： Progressive Generation of Animatable 3D Faces under Text Guidance
+
+4、 Learning Foresightful Dense Visual Affordance for Deformable Object Manipulation
