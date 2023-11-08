@@ -1,0 +1,81 @@
+shader分析工具：
+	renderdoc，Nsight
+
+shader性能优化：
+	shader LOD优化？？
+	Group by PipelineState
+
+
+常用的性能分析指标：
+	Instrution Cycles【指令周期、指令优化】： Total Instruction cycles: 因为GPU硬件单元是并行运行的，
+		FS => VS / 避免隐式转换 / Varying数据尽可能组织称向量形式
+		【branch,flatten,loop,unroll,unroll】
+		Early-z失效： 
+	所以我们同时需要关注不同硬件单元的Cycles：用于提高Shader的Throughput（吞吐量）；
+	Register Usage：
+不同的芯片厂商都有对应的shader性能分析和优化工具：
+	Arm的Mali Offline Compiler
+	NVIDIA的NVIDIA ShaderPerf
+	Imagination的PVRShaderEditor
+
+GPU中的寄存器个数是优先的：
+	标量寄存器和向量寄存器：标量寄存器通常存储并行计算的各个部分共同需要参照的数据【比如
+	mvp矩阵或者指向mvp的指针】；向量寄存器看作是shader程序中的临时变量
+GPU在开始执行shader之前，需要分配寄存器： 寄存器瓶颈会受到渲染器的数量等影响
+
+
+shader内部：
+	1、 阻止early-z： 开启AlphaTest,Clip(),Discard,Alpha Coverage,光栅化后修改深度，手动关闭Depth Test
+	2、 通过UI，统计渲染一次所需要的平均时间
+	3、 大部分手机会自动降频； snapdragon profile：：观察是否降频 <-> mali offline compiler
+
+	Alpha Test / Color Mask/ sRGB硬件解码
+
+opengl es shader性能的方法，依赖AMS malioc工具
+	1、 Arm Mobile Studio： 包含Mali Offline Compiler快速分析着色器
+	2、 renderdoc, snapdragon Profiler, Nsight, RenderDoc 针对移动平台截帧
+	3、 分析顶点着色器 & 分析片段着色器
+
+	https://account.arm.com/
+
+
+https://www.zhihu.com/question/25421190（如何评测shader的效率）
+配置信息：
+	1、 Hardware硬件信息
+	2、 Architecture GPU架构
+	3、 Driver驱动
+	4、 Shader type图形API及shader类型
+Shader信息：
+	1、 Work Registers： 该shader工作使用的寄存器数量，减少提升性能
+	2、 Uniform registers： 存储着色器可能需要的常量，所有的线程都有共享uniform register
+	3、 Stack spilling 是否有变量被放置在栈内存中，有的话GPU读取是性能消耗较大
+	4、 16-bit arithmetic以16位或更低精度执行的算数运算的百分比；数值越高代表shader性能越好
+	5、 Total Instruction cycles： Shader生成的所有指令的累计执行周期数，与控制流无关
+	6、 Shortest PathCycles、Longest Path Cycles 通过着色器程序的最短/最长控制流路径的循环数的估计
+	7、 A = Arithmetic在Mali Valhall架构的GPU实现了两个并行处理单元，算数单元A被拆分位FMA，CVT，SFU
+	8、 FMA（Fused Multi-Add）主要的算术管道，实现了着色器代码中广泛使用的浮点乘法器
+	9、 CVT（Convert）单元负责基本的整型操作，数据类型的转换、分支处理
+	10、SFU（Special Function Unit）： 三角函数，指数，对数等
+	11、LS=Load、Store operation读取和存储的操作消耗，处理所有非纹理内存访问
+	12、T = Texture operations 所有纹理采样和过滤操作消耗
+	13、V = Varying operations 在shader中不同单位插值的消耗
+	14、Bound循环技术最高的功能单元，识别瓶颈单元，A是算术边界则通过减少数学运算的数量或精度来优化
+	<补充>：：memory access越少越好
+Shader properties：
+	1、 Has uniform computation：是否有任何计算仅依赖于文字常量或统一值，尽量把类似计算移植在CPU进行逻辑处理
+	2、 Has side-effects: 着色器是否具有在固定图形管道之外的内存中可见的副作用
+	3、 Modifies coverage： 片段着色器是否具有可以通过着色器执行更改的覆盖掩码
+	4、 uses late ZS update： 具有可修改覆盖了从的shader必须使用late ZS update；会降低early ZS test在同一坐标上的later片段效率
+	5、 uses late ZS test：片段shader是否包含了强制late ZS test的逻辑，会金庸early ZS test和hidden surface removal的使用，会导致性能损失
+	6、 Reads color buffer： fragment shader是否包含了从color buffer中读取的逻辑
+
+
+优化建议：
+	1、 尽量不要使用if,discard;Discard会使GPU的early-z机制失效
+	2、 减低相关运算量：反三角函数等搞复杂度三角函数的计算会增加GPU SFU的开销
+	3、 避免类型转换：shader中使用浮点和整形混合运算时，GPU需要先把整形转换浮点，多处一条指令
+	4、 高精度计算和浮点数计算比中精度或整形数的计算开销明显要高，尽可能减少使用
+	5、 避免触发spilling，当shader使用超过了硬件的寄存器数量，会触发spilling机制，使用内存临时代替寄存器
+	6、 纹理指令数，在vs阶段一般不会去进行纹理采样，高耗时的操作会阻塞后续ps阶段，纹理的数量最好不要超过4个
+	7、 每次setpass call会刷新GPU内部的渲染状态，造成更多的开销，同样材质的物体排序绘制也无法合批
+    8、 尽量使用内置函数（pow,normalize,dot,）;慎用超越函数
